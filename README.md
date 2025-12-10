@@ -13,7 +13,74 @@ This project is primarily built to learn, practice and demonstrate Go for produc
 ## Demo
 ```shell
 # Create a payment attempt
-$ curl -X POST
+$ curl -X POST http://localhost:8080/attempts \
+  -H "Idempotency-Key: key_abc123" \
+  -d '{"amount": 1000, "currency": "GBP"}'
+
+{
+  "attempt_id": "attempt_xyz789",
+  "status": "CREATED",
+  "amount": 1000,
+  "currency": "GBP"
+}
+
+# Authorize the payment
+$ curl -X POST http://localhost:8080/attempts/attempt_xyz789/authorize \
+  -H "Idempotency-Key: key_def456"
+
+{
+  "attempt_id": "attempt_xyz789",
+  "status": "AUTHORIZED",
+  "amount": 1000,
+  "currency": "GBP"
+}
+
+# Capture the payment
+$ curl -X POST http://localhost:8080/attempts/attempt_xyz789/capture \
+  -H "Idempotency-Key: key_ghi789"
+
+{
+  "attempt_id": "attempt_xyz789",
+  "status": "CAPTURED",
+  "amount": 1000,
+  "currency": "GBP"
+}
+
+# Check what happened
+$ curl http://localhost:8080/attempts/attempt_xyz789
+
+{
+  "attempt_id": "attempt_xyz789",
+  "status": "CAPTURED",
+  "timeline": [
+    {"event": "created", "timestamp": "2025-01-15T10:30:00Z"},
+    {"event": "authorized", "timestamp": "2025-01-15T10:30:15Z"},
+    {"event": "captured", "timestamp": "2025-01-15T10:30:30Z"}
+  ]
+}
+
+# What if I retry the create with the same idempotency key?
+$ curl -X POST http://localhost:8080/attempts \
+  -H "Idempotency-Key: key_abc123" \
+  -d '{"amount": 1000, "currency": "GBP"}'
+
+# Returns same attempt_id, doesn't create duplicate
+{
+  "attempt_id": "attempt_xyz789",
+  "status": "CREATED",
+  "amount": 1000,
+  "currency": "GBP"
+}
+
+# What if I use same key but different payload?
+$ curl -X POST http://localhost:8080/attempts \
+  -H "Idempotency-Key: key_abc123" \
+  -d '{"amount": 2000, "currency": "GBP"}'
+
+{
+  "error": "idempotency_mismatch",
+  "message": "Different request body for existing idempotency key"
+}
 ```
 
 >
